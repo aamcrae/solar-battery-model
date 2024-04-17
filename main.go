@@ -73,20 +73,20 @@ type stat struct {
 
 // totals holds the accumulated totals
 type totals struct {
-	cost float64	// Cost in cents
-	imp float64 // Imported power in kWh
-	exp float64	// Exported power in kWh
+	cost float64 // Cost in cents
+	imp  float64 // Imported power in kWh
+	exp  float64 // Exported power in kWh
 }
 
 var nosolar, solar, solarBattery totals
 
 var battery float64 // Running value of battery charge
 var lastTime time.Time
-var chargeTotal float64 // Total of power used to charge battery (kWh)
+var chargeTotal float64      // Total of power used to charge battery (kWh)
 var consumptionTotal float64 // Total power consumed (kWh)
-var batteryTotal float64 // Total battery power discharged (kWh)
-var imp, exp, gen stat // Running values of import, export and generated power (kWh)
-var ndays int // Number of days processed
+var batteryTotal float64     // Total battery power discharged (kWh)
+var imp, exp, gen stat       // Running values of import, export and generated power (kWh)
+var ndays int                // Number of days processed
 
 func main() {
 	flag.Parse()
@@ -109,7 +109,7 @@ func main() {
 	solar.cost += *dailyCharge * float64(ndays)
 	nosolar.cost += *dailyCharge * float64(ndays)
 	solarBattery.cost += *dailyCharge * float64(ndays)
-	ny := float64(ndays) / 365.25	// Number of years
+	ny := float64(ndays) / 365.25 // Number of years
 	fmt.Printf("Days: %d, years: %.1f\n", ndays, ny)
 	// Convert to dollars
 	nosolar.cost /= 100.0
@@ -122,16 +122,16 @@ func main() {
 	fmt.Printf("Total consumption: %.0fkWh, battery charging %.0fkWh, battery discharge %0.fkWh\n", consumptionTotal, chargeTotal, batteryTotal)
 	// Show differences
 	diff := nosolar.cost - solar.cost
-	fmt.Printf("Between no-solar/solar per day: $%.2f, per year: $%.2f\n", diff/float64(ndays), diff/ny)
+	fmt.Printf("Between no-solar/solar: total $%.2f, per day: $%.2f, per year: $%.2f\n", diff, diff/float64(ndays), diff/ny)
 	diff = nosolar.cost - solarBattery.cost
-	fmt.Printf("Between no-solar/solar+battery per day: $%.2f, per year: $%.2f\n", diff/float64(ndays), diff/ny)
+	fmt.Printf("Between no-solar/solar+battery: total $%.2f, per day: $%.2f, per year: $%.2f\n", diff, diff/float64(ndays), diff/ny)
 	diff = solar.cost - solarBattery.cost
-	fmt.Printf("Between solar/solar+battery per day: $%.2f, per year: $%.2f\n", diff/float64(ndays), diff/ny)
+	fmt.Printf("Between solar/solar+battery: total $%.2f, per day: $%.2f, per year: $%.2f\n", diff, diff/float64(ndays), diff/ny)
 }
 
 // printTotal prints the totals for the scenario
 func printTotal(title string, t totals) {
-	ny := float64(ndays) / 365.25	// Number of years
+	ny := float64(ndays) / 365.25 // Number of years
 	c := fmt.Sprintf("$%.2f", t.cost)
 	pa := fmt.Sprintf("$%.2f", t.cost/ny)
 	fmt.Printf("%-14s| %10s | %9s | %8.0f | %8.0f |\n", title, c, pa, t.imp, t.exp)
@@ -243,7 +243,7 @@ func readCSV(file string) error {
 		consumptionTotal += consumption
 		// Calculate no solar value
 		nosolar.imp += consumption
-		nosolar.cost += consumption**cost
+		nosolar.cost += consumption * *cost
 		// Calculate values without battery
 		solar.imp += imp.value
 		solar.exp += exp.value
