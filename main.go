@@ -45,7 +45,7 @@ import (
 	"time"
 )
 
-var baseDir = flag.String("dir", "/var/cache/MeterMan/csv", "Base directory for CSV files")
+var baseDir = flag.String("dir", "/var/lib/MeterMan/csv", "Base directory for CSV files")
 var years = flag.String("years", "2021,2022,2023,2024", "Years to analyse")
 var feedIn = flag.Float64("feedin", 12.0, "Feed-in price in cents per kWh")
 var cost = flag.Float64("cost", 37.26800, "Import cost in cents per kWh")
