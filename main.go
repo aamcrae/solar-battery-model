@@ -46,10 +46,10 @@ import (
 )
 
 var baseDir = flag.String("dir", "/var/lib/MeterMan/csv", "Base directory for CSV files")
-var years = flag.String("years", "2021,2022,2023,2024", "Years to analyse")
+var years = flag.String("years", "2021,2022,2023,2024,2025", "Years to analyse")
 var feedIn = flag.Float64("feedin", 12.0, "Feed-in price in cents per kWh")
-var cost = flag.Float64("cost", 37.26800, "Import cost in cents per kWh")
-var dailyCharge = flag.Float64("daily", 100.892, "Daily supply charge in cents")
+var cost = flag.Float64("cost", 43.538, "Import cost in cents per kWh")
+var dailyCharge = flag.Float64("daily", 174.735, "Daily supply charge in cents")
 var batteryCapacity = flag.Float64("battery", 13.5, "Battery capacity in kWh")
 var batteryPower = flag.Float64("discharge", 5.0, "Battery output power in kW")
 var rechargeEfficiency = flag.Float64("efficiency", 90.0, "Battery recharge efficiency in percentage")
