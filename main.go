@@ -93,7 +93,7 @@ type totals struct {
 	exp  float64 // Exported power in kWh
 }
 
-var feedIn, kwhCost, batteryCapacity, batteryPower, rechargeEfficiency float64
+var config Config
 
 var nosolar, solar, solarBattery totals
 
@@ -112,22 +112,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Can't read config %s: %v", *configFile, err)
 	}
-	var c Config
-	if err := yaml.Unmarshal(conf, &c); err != nil {
+	if err := yaml.Unmarshal(conf, &config); err != nil {
 		log.Fatalf("Can't parse config %s: %v", *configFile, err)
 	}
-	fmt.Printf("Config is %v\n", c)
-	kwhCost = c.Cost[0].Kwh
-	feedIn = c.Cost[0].FeedIn
-	batteryCapacity = c.Battery.Size
-	batteryPower = c.Battery.Discharge
-	rechargeEfficiency = c.Battery.Recharge
-	files, err := getFileNames(*baseDir, c.Years)
+	files, err := getFileNames(*baseDir, config.Years)
 	if err != nil {
 		log.Fatalf("%s: %v", *baseDir, err)
 	}
 	// Assume battery is already charged
-	battery = batteryPower
+	battery = config.Battery.Discharge
 	// Iterate through all the files in time order, and read the CSV data.
 	for _, f := range files {
 		err := readCSV(f)
@@ -136,10 +129,6 @@ func main() {
 			continue
 		}
 	}
-	// Add the daily supply charge
-	solar.cost += c.Cost[0].Daily * float64(ndays)
-	nosolar.cost += c.Cost[0].Daily * float64(ndays)
-	solarBattery.cost += c.Cost[0].Daily * float64(ndays)
 	ny := float64(ndays) / 365.25 // Number of years
 	fmt.Printf("Days: %d, years: %.1f\n", ndays, ny)
 	// Convert to dollars
@@ -242,6 +231,8 @@ func readCSV(file string) error {
 	}
 	// valid CSV fields are present
 	ndays++
+	// TODO: Lookup the cost
+	costIndex := 0
 	// Iterate through the records
 	for i, data := range r[1:] {
 		var err error
@@ -277,14 +268,14 @@ func readCSV(file string) error {
 		consumptionTotal += consumption
 		// Calculate no solar value
 		nosolar.imp += consumption
-		nosolar.cost += consumption * kwhCost
+		nosolar.cost += consumption * config.Cost[costIndex].Kwh
 		// Calculate values without battery
 		solar.imp += imp.value
 		solar.exp += exp.value
-		solar.cost += imp.value * kwhCost - exp.value * feedIn
+		solar.cost += imp.value * config.Cost[costIndex].Kwh - exp.value * config.Cost[costIndex].FeedIn
 		// Cost with a battery.
 		// If any power imported, work out what the battery could have supplied in that interval
-		bCap := batteryPower * float64(intv) / float64(time.Hour) // Max energy that battery can supply in this interval
+		bCap := config.Battery.Discharge * float64(intv) / float64(time.Hour) // Max energy that battery can supply in this interval
 		if imp.value > 0 {
 			bImp := imp.value
 			bUsed := bCap
@@ -304,14 +295,14 @@ func readCSV(file string) error {
 			battery -= bUsed
 			batteryTotal += bUsed
 			solarBattery.imp += bImp
-			solarBattery.cost += bImp * kwhCost
+			solarBattery.cost += bImp * config.Cost[costIndex].Kwh
 		}
 		// If any power exported, then apply it to battery charging instead of feedin.
 		// Battery charging isn't 1:1, there is a recharge efficiency i.e
 		// At 90%, it takes 10/9 kWh to charge 1 kWh
 		if exp.value > 0 {
 			// power required to charge battery
-			bChg := (batteryCapacity - battery) / (rechargeEfficiency / 100.0)
+			bChg := (config.Battery.Size - battery) / (config.Battery.Recharge / 100.0)
 			// Cap to the max charging rate of the battery.
 			if bChg > bCap {
 				bChg = bCap
@@ -324,15 +315,19 @@ func readCSV(file string) error {
 				bChg = expFeed
 				expFeed = 0
 			}
-			battery += bChg * (rechargeEfficiency / 100.0)
+			battery += bChg * (config.Battery.Recharge / 100.0)
 			chargeTotal += bChg
-			if battery > batteryCapacity {
+			if battery > config.Battery.Size {
 				log.Printf("Overcharge!: %f", battery)
 			}
 			solarBattery.exp += expFeed
-			solarBattery.cost -= expFeed * feedIn
+			solarBattery.cost -= expFeed * config.Cost[costIndex].FeedIn
 		}
 	}
+	// Add the daily supply charge
+	solar.cost += config.Cost[costIndex].Daily
+	nosolar.cost += config.Cost[costIndex].Daily
+	solarBattery.cost += config.Cost[costIndex].Daily
 	return nil
 }
 
