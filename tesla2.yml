@@ -1,0 +1,16 @@
+battery:
+  size: 13.5
+  recharge: 90
+  discharge: 5
+
+years: [2021,2022,2023,2024,2025]
+
+cost:
+  - start: 2021-1-1
+    daily: 174.735
+    kwh: 43.538
+    feed_in: 12.0
+  - start: 2025-1-1
+    daily: 174.735
+    kwh: 43.538
+    feed_in: 12.0

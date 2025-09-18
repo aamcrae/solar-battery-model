@@ -36,23 +36,19 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 var baseDir = flag.String("dir", "/var/lib/MeterMan/csv", "Base directory for CSV files")
-var years = flag.String("years", "2021,2022,2023,2024,2025", "Years to analyse")
-var feedIn = flag.Float64("feedin", 12.0, "Feed-in price in cents per kWh")
-var cost = flag.Float64("cost", 43.538, "Import cost in cents per kWh")
-var dailyCharge = flag.Float64("daily", 174.735, "Daily supply charge in cents")
-var batteryCapacity = flag.Float64("battery", 13.5, "Battery capacity in kWh")
-var batteryPower = flag.Float64("discharge", 5.0, "Battery output power in kW")
-var rechargeEfficiency = flag.Float64("efficiency", 90.0, "Battery recharge efficiency in percentage")
+var configFile = flag.String("config", "costs.yml", "YAML config file")
 var interval = flag.Int("interval", 10, "Max interval betweeen samples")
 
 // Format for parsing combined date/time
@@ -64,6 +60,25 @@ const h_time = "time"
 const h_import = "IMP"
 const h_export = "EXP"
 const h_gen = "GEN-T"
+
+type Battery struct {
+	Size float64 `yaml:"size"`
+	Recharge float64 `yaml:"recharge"`
+	Discharge float64 `yaml:"discharge"`
+}
+
+type Cost struct {
+	Start string
+	Daily float64
+	Kwh float64
+	FeedIn float64 `yaml:"feed_in"`
+}
+
+type Config struct {
+	Battery Battery
+	Years []int
+	Cost []Cost
+}
 
 // Accumlators tracking
 type stat struct {
@@ -78,6 +93,8 @@ type totals struct {
 	exp  float64 // Exported power in kWh
 }
 
+var feedIn, kwhCost, batteryCapacity, batteryPower, rechargeEfficiency float64
+
 var nosolar, solar, solarBattery totals
 
 var battery float64 // Running value of battery charge
@@ -91,12 +108,26 @@ var ndays int                // Number of days processed
 func main() {
 	flag.Parse()
 
-	files, err := getFileNames(*baseDir, *years)
+	conf, err := ioutil.ReadFile(*configFile)
+	if err != nil {
+		log.Fatalf("Can't read config %s: %v", *configFile, err)
+	}
+	var c Config
+	if err := yaml.Unmarshal(conf, &c); err != nil {
+		log.Fatalf("Can't parse config %s: %v", *configFile, err)
+	}
+	fmt.Printf("Config is %v\n", c)
+	kwhCost = c.Cost[0].Kwh
+	feedIn = c.Cost[0].FeedIn
+	batteryCapacity = c.Battery.Size
+	batteryPower = c.Battery.Discharge
+	rechargeEfficiency = c.Battery.Recharge
+	files, err := getFileNames(*baseDir, c.Years)
 	if err != nil {
 		log.Fatalf("%s: %v", *baseDir, err)
 	}
 	// Assume battery is already charged
-	battery = *batteryPower
+	battery = batteryPower
 	// Iterate through all the files in time order, and read the CSV data.
 	for _, f := range files {
 		err := readCSV(f)
@@ -106,9 +137,9 @@ func main() {
 		}
 	}
 	// Add the daily supply charge
-	solar.cost += *dailyCharge * float64(ndays)
-	nosolar.cost += *dailyCharge * float64(ndays)
-	solarBattery.cost += *dailyCharge * float64(ndays)
+	solar.cost += c.Cost[0].Daily * float64(ndays)
+	nosolar.cost += c.Cost[0].Daily * float64(ndays)
+	solarBattery.cost += c.Cost[0].Daily * float64(ndays)
 	ny := float64(ndays) / 365.25 // Number of years
 	fmt.Printf("Days: %d, years: %.1f\n", ndays, ny)
 	// Convert to dollars
@@ -138,11 +169,11 @@ func printTotal(title string, t totals) {
 }
 
 // getFileNames walks the directory and returns the files in sorted order.
-func getFileNames(base, years string) ([]string, error) {
+func getFileNames(base string, years []int) ([]string, error) {
 	var files []string
 
-	for _, dir := range strings.Split(years, ",") {
-		err := filepath.Walk(filepath.Join(base, dir),
+	for _, dir := range years {
+		err := filepath.Walk(filepath.Join(base, fmt.Sprintf("%d", dir)),
 			func(path string, info os.FileInfo, err error) error {
 				if (info.Mode() & os.ModeType) == 0 {
 					files = append(files, path)
@@ -246,14 +277,14 @@ func readCSV(file string) error {
 		consumptionTotal += consumption
 		// Calculate no solar value
 		nosolar.imp += consumption
-		nosolar.cost += consumption * *cost
+		nosolar.cost += consumption * kwhCost
 		// Calculate values without battery
 		solar.imp += imp.value
 		solar.exp += exp.value
-		solar.cost += imp.value**cost - exp.value**feedIn
+		solar.cost += imp.value * kwhCost - exp.value * feedIn
 		// Cost with a battery.
 		// If any power imported, work out what the battery could have supplied in that interval
-		bCap := *batteryPower * float64(intv) / float64(time.Hour) // Max energy that battery can supply in this interval
+		bCap := batteryPower * float64(intv) / float64(time.Hour) // Max energy that battery can supply in this interval
 		if imp.value > 0 {
 			bImp := imp.value
 			bUsed := bCap
@@ -273,14 +304,14 @@ func readCSV(file string) error {
 			battery -= bUsed
 			batteryTotal += bUsed
 			solarBattery.imp += bImp
-			solarBattery.cost += bImp * *cost
+			solarBattery.cost += bImp * kwhCost
 		}
 		// If any power exported, then apply it to battery charging instead of feedin.
 		// Battery charging isn't 1:1, there is a recharge efficiency i.e
 		// At 90%, it takes 10/9 kWh to charge 1 kWh
 		if exp.value > 0 {
 			// power required to charge battery
-			bChg := (*batteryCapacity - battery) / (*rechargeEfficiency / 100.0)
+			bChg := (batteryCapacity - battery) / (rechargeEfficiency / 100.0)
 			// Cap to the max charging rate of the battery.
 			if bChg > bCap {
 				bChg = bCap
@@ -293,13 +324,13 @@ func readCSV(file string) error {
 				bChg = expFeed
 				expFeed = 0
 			}
-			battery += bChg * (*rechargeEfficiency / 100.0)
+			battery += bChg * (rechargeEfficiency / 100.0)
 			chargeTotal += bChg
-			if battery > *batteryCapacity {
+			if battery > batteryCapacity {
 				log.Printf("Overcharge!: %f", battery)
 			}
 			solarBattery.exp += expFeed
-			solarBattery.cost -= expFeed * *feedIn
+			solarBattery.cost -= expFeed * feedIn
 		}
 	}
 	return nil
