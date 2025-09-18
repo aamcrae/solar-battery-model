@@ -62,22 +62,22 @@ const h_export = "EXP"
 const h_gen = "GEN-T"
 
 type Battery struct {
-	Size float64 `yaml:"size"`
-	Recharge float64 `yaml:"recharge"`
+	Size      float64 `yaml:"size"`
+	Recharge  float64 `yaml:"recharge"`
 	Discharge float64 `yaml:"discharge"`
 }
 
 type Cost struct {
-	Start string
-	Daily float64
-	Kwh float64
+	Start  string
+	Daily  float64
+	Kwh    float64
 	FeedIn float64 `yaml:"feed_in"`
 }
 
 type Config struct {
 	Battery Battery
-	Years []int
-	Cost []Cost
+	Years   []int
+	Cost    []Cost
 }
 
 // Accumlators tracking
@@ -272,7 +272,7 @@ func readCSV(file string) error {
 		// Calculate values without battery
 		solar.imp += imp.value
 		solar.exp += exp.value
-		solar.cost += imp.value * config.Cost[costIndex].Kwh - exp.value * config.Cost[costIndex].FeedIn
+		solar.cost += imp.value*config.Cost[costIndex].Kwh - exp.value*config.Cost[costIndex].FeedIn
 		// Cost with a battery.
 		// If any power imported, work out what the battery could have supplied in that interval
 		bCap := config.Battery.Discharge * float64(intv) / float64(time.Hour) // Max energy that battery can supply in this interval
