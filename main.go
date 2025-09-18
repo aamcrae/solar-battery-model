@@ -164,7 +164,10 @@ func readCSV(file string) error {
 		return err
 	}
 	defer f.Close()
-	r, err := csv.NewReader(f).ReadAll()
+	rdr := csv.NewReader(f)
+	// Allow variable number of fields
+	rdr.FieldsPerRecord = -1
+	r, err := rdr.ReadAll()
 	if err != nil {
 		return err
 	}
@@ -212,7 +215,7 @@ func readCSV(file string) error {
 	for i, data := range r[1:] {
 		var err error
 
-		if len(data) != len(r[0]) {
+		if len(data) < len(r[0]) {
 			log.Printf("%s: %d: Mismatch in column count", file, i+1)
 			continue
 		}
