@@ -129,6 +129,7 @@ func main() {
 			continue
 		}
 	}
+	fmt.Printf("Battery capacity: %.1fkWh, power %.1fkW, assumed recharge efficiency: %.0f%%\n", config.Battery.Size, config.Battery.Discharge, config.Battery.Recharge)
 	ny := float64(ndays) / 365.25 // Number of years
 	fmt.Printf("Days: %d, years: %.1f\n", ndays, ny)
 	// Convert to dollars
