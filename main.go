@@ -136,7 +136,7 @@ func main() {
 	nosolar.cost /= 100.0
 	solar.cost /= 100.0
 	solarBattery.cost /= 100.0
-	fmt.Printf("              | Total cost |  Cost PA  |  Import  |  Export  |\n")
+	fmt.Printf("              | Total cost |  Cost PA  |  Import  |  Export  |  Imp p/d |  Exp p/d |\n")
 	printTotal("No solar", nosolar)
 	printTotal("Solar", solar)
 	printTotal("Solar+battery", solarBattery)
@@ -155,7 +155,7 @@ func printTotal(title string, t totals) {
 	ny := float64(ndays) / 365.25 // Number of years
 	c := fmt.Sprintf("$%.2f", t.cost)
 	pa := fmt.Sprintf("$%.2f", t.cost/ny)
-	fmt.Printf("%-14s| %10s | %9s | %8.0f | %8.0f |\n", title, c, pa, t.imp, t.exp)
+	fmt.Printf("%-14s| %10s | %9s | %8.0f | %8.0f | %8.2f | %8.2f |\n", title, c, pa, t.imp, t.exp, t.imp/float64(ndays), t.exp/float64(ndays))
 }
 
 // getFileNames walks the directory and returns the files in sorted order.

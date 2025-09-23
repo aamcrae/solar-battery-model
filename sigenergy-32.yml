@@ -1,7 +1,7 @@
 battery:
-  size: 28
+  size: 32
   recharge: 90
-  discharge: 10
+  discharge: 16
 
 years: [2021,2022,2023,2024,2025]
 
